@@ -23,6 +23,12 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define MAX_SPEED 50
 
+#define BLOCK_WIDTH (display.width()/NUM_BLOCKS_LR - BLOCK_PADDING)
+#define PADDLE_WIDTH BLOCK_WIDTH
+
+#define BLOCK_HEIGHT ((display.height()/2)/NUM_BLOCKS_UD - BLOCK_PADDING)
+#define PADDLE_HEIGHT BLOCK_HEIGHT
+
 typedef struct {
   double x = 0;
   double y = 0;
@@ -71,7 +77,9 @@ void setup() {
 
 void loop() {
   int i, j;
-
+  double speedXY, posX;
+  /******** GAME LOGIC ********/
+  
   if(leftButton()) {
     paddle_x -= 5;
   } 
@@ -87,34 +95,55 @@ void loop() {
       MAX_SPEED * (ball.vel_x > 0 ? -1 : 1) : 
       ball.vel_x;
   
+  speedXY = sqrt(ball.vel_x*ball.vel_x + ball.vel_y*ball.vel_y);
   
   /* Collision with wall! */
   if (ball.x - CIRCLE_RADIUS < 0 || ball.x + CIRCLE_RADIUS > display.width()) {
     ball.vel_x *= -1;
   }
-  if (ball.y - CIRCLE_RADIUS < 0 || ball.y + CIRCLE_RADIUS > display.height()) {
+  if (ball.y - CIRCLE_RADIUS < 0) {
     ball.vel_y *= -1;
   }
-  
+  if(ball.y + CIRCLE_RADIUS > display.height()) {
+    ball.vel_y *= -1;
+    Serial.println("Game over!");
+  }
   /* Collision with paddle! */
-  if ((ball.x - paddle_x <= (display.width()/NUM_BLOCKS_LR - BLOCK_PADDING) && ball.x - paddle_x > 0) && 
-                    (ball.y + CIRCLE_RADIUS) >= PADDLE_POSITION_Y) {
-    double paddleWidth = display.width()/NUM_BLOCKS_LR - BLOCK_PADDING;
-    double paddleCenter = paddle_x + paddleWidth/2;
-    double speedX = ball.vel_x;
-    double speedY = ball.vel_y;
-    double speedXY = sqrt(speedX*speedX + speedY*speedY);
-    double posX = (ball.x - paddleCenter) / (paddleWidth/2);
+  if (((ball.x - CIRCLE_RADIUS) - paddle_x <= PADDLE_WIDTH && (ball.x + CIRCLE_RADIUS) - paddle_x >= 0) && 
+                    ball.y + CIRCLE_RADIUS >= PADDLE_POSITION_Y) {
+    posX = (ball.x - (paddle_x + PADDLE_WIDTH/2)) / (PADDLE_WIDTH/2);
     
-    speedX = speedXY * INFLUENCE_X * posX;
-    ball.vel_x = speedX;
+    ball.vel_x = speedXY * INFLUENCE_X * posX;
 
-    speedY = sqrt(abs(speedXY*speedXY - speedX*speedX)) * (speedY > 0 ? -1 : 1);
-    ball.vel_y = speedY;
+    ball.vel_y = sqrt(abs(speedXY*speedXY - ball.vel_x*ball.vel_x)) * (ball.vel_y > 0 ? -1 : 1);
+  }
+
+  /* Test for collisions with blocks */
+  for(i = 0; i < NUM_BLOCKS_UD; i++) {
+    for(j = 0; j < NUM_BLOCKS_LR; j++) {
+      Block block = blocks[i][j];
+      if (block.active == false)
+        continue;
+                
+      /* Collision! */
+      if (((ball.x - CIRCLE_RADIUS) - block.x <= BLOCK_WIDTH && (ball.x - CIRCLE_RADIUS) - block.x >= 0) && 
+                    ((ball.y - CIRCLE_RADIUS) - block.y <= BLOCK_HEIGHT && (ball.y + CIRCLE_RADIUS) + (block.y - BLOCK_HEIGHT) >= 0)) {
+          /* Collision on the side */
+          if((ball.x - CIRCLE_RADIUS) - block.x <= BLOCK_WIDTH && (ball.x - CIRCLE_RADIUS) - block.x >= 0)
+            ball.vel_x *= -1;
+            
+          /* Collision on top/bottom */
+          if ((ball.y - CIRCLE_RADIUS) - block.y <= BLOCK_HEIGHT && (ball.y + CIRCLE_RADIUS) + (block.y - BLOCK_HEIGHT) >= 0)
+            ball.vel_y *= -1;
+          blocks[i][j].active = false;
+      }
+    }
   }
   
   ball.y += ball.vel_y;
   ball.x += ball.vel_x;
+
+  /******** END OF GAME LOGIC ********/
   
   /* Draw the game */
   display.clearDisplay();
@@ -122,7 +151,6 @@ void loop() {
   for(i = 0; i < NUM_BLOCKS_UD; i++) {
     for(j = 0; j < NUM_BLOCKS_LR; j++) {
       if(blocks[i][j].active == true) {
-        
         if(blocks[i][j].filled == false)
           drawRoundRect(blocks[i][j].x, blocks[i][j].y);
         else
@@ -148,7 +176,7 @@ bool rightButton(void) {
 }
 
 void fillRect(int x, int y) {
-  display.fillRect(x, y, display.width()/NUM_BLOCKS_LR - BLOCK_PADDING, (display.height()/2)/NUM_BLOCKS_UD - BLOCK_PADDING, 
+  display.fillRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT, 
         SSD1306_INVERSE);
 }
 
@@ -157,12 +185,12 @@ void drawCircle(int x, int y) {
 }
 
 void drawRoundRect(int x, int y) {
-  display.drawRoundRect(x, y, display.width()/NUM_BLOCKS_LR - BLOCK_PADDING, (display.height()/2)/NUM_BLOCKS_UD - BLOCK_PADDING,
+  display.drawRoundRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT,
       10/4, SSD1306_INVERSE);
 }
 
 void fillRoundRect(int x, int y) {
-   display.fillRoundRect(x, y, display.width()/NUM_BLOCKS_LR - BLOCK_PADDING, (display.height()/2)/NUM_BLOCKS_UD - BLOCK_PADDING,
+   display.fillRoundRect(x, y, BLOCK_WIDTH, BLOCK_HEIGHT,
       10/4, SSD1306_INVERSE);
 }
 

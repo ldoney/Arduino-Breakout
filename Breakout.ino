@@ -210,19 +210,29 @@ void loop() {
         Block block = blocks[i][j];
         if (block.active == false)
           continue;
-                  
+
+        bool side = ((ball.x - CIRCLE_RADIUS) <= (block.x + BLOCK_WIDTH) && (ball.x + CIRCLE_RADIUS) >=  block.x);
+        bool topbot = ((ball.y - CIRCLE_RADIUS) <= (block.y + BLOCK_HEIGHT) && (ball.y + CIRCLE_RADIUS) >= block.y);
         /* Collision! */
-        if (((ball.x - CIRCLE_RADIUS) - (block.x + BLOCK_WIDTH) <= 0 && (ball.x + CIRCLE_RADIUS) - block.x >= 0) && 
-                      ((ball.y - CIRCLE_RADIUS) - (block.y + BLOCK_HEIGHT) <= 0 && (ball.y + CIRCLE_RADIUS) - block.y >= 0)) {
+        if ( side && topbot ) {
                         
             /* Collision on the side */
-            if((ball.x - CIRCLE_RADIUS) - (block.x + BLOCK_WIDTH) <= 0 && (ball.x + CIRCLE_RADIUS) - block.x >= 0)
+            if (ball.y <= (block.y + BLOCK_HEIGHT) && ball.y >= block.y) {
+              Serial.println("Side!");
               ball.vel_x *= -1.1;
-              
+            }
             /* Collision on top/bottom */
-            if ((ball.y - CIRCLE_RADIUS) - (block.y + BLOCK_HEIGHT) <= 0 && (ball.y + CIRCLE_RADIUS) - block.y >= 0)
+            else if (ball.x <= (block.x + BLOCK_WIDTH) && ball.x >= block.x) {
+              Serial.println("Top/Bottom!");
               ball.vel_y *= -1.1;
-              
+            }
+            /* Collision on corner! */
+            else {
+              Serial.println("Corner!");
+              ball.vel_x *= -1.1;
+              ball.vel_y *= -1.1;
+            }
+            
             blocks[i][j].active = false;
             blocks[i][j].hitcycles = STATUS_CYCLES;
             tone(SPEAKER, HIT_TONE);
